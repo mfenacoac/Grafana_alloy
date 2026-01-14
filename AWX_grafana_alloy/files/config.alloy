@@ -1,0 +1,492 @@
+logging {
+  level = "info"
+}
+
+// ============================================
+// MÉTRICAS DE WINDOWS
+// ============================================
+
+prometheus.exporter.windows "default" {
+  enabled_collectors = [
+    "cpu",
+    "cs",
+    "logical_disk",
+    "net",
+    "os",
+    "system",
+    "cpu_info",
+    "memory",
+    "time",
+  ]
+}
+
+// ============================================
+// LOGS DEL SISTEMA WINDOWS
+// ============================================
+
+loki.source.windowsevent "application" {
+    eventlog_name = "Application"
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// JBOSS 1 - T24Prod01R3B
+// ============================================
+
+local.file_match "jboss1_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\3rdParty\\As\\T24Prod01R3B\\standalone\\log\\server.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "jboss1_scrape" {
+    targets = local.file_match.jboss1_files.targets
+    forward_to = [loki.process.jboss1_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "jboss1_processor" {
+    // Extraer trace_id y span_id (formato mejorado basado en tu log TAFJ)
+    stage.regex {
+        expression = ".*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "JBOSS_APPL",
+            filename = "log_jboss1",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            jboss_instance = "T24Prod01R3B",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// JBOSS 2 - T24Prod02R3B
+// ============================================
+
+local.file_match "jboss2_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\3rdParty\\As\\T24Prod02R3B\\standalone\\log\\server.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "jboss2_scrape" {
+    targets = local.file_match.jboss2_files.targets
+    forward_to = [loki.process.jboss2_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "jboss2_processor" {
+    // Extraer trace_id y span_id
+    stage.regex {
+        expression = ".*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "JBOSS_APPL",
+            filename = "log_jboss2",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            jboss_instance = "T24Prod02R3B",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+// ============================================
+// TAFJ - DATABASE LOG
+// ============================================
+local.file_match "tafj_database_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\TAFJ\\log\\database.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "tafj_database_scrape" {
+    targets = local.file_match.tafj_database_files.targets
+    forward_to = [loki.process.tafj_database_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "tafj_database_processor" {
+    // Extraer sessionId, span_id, trace_id (formato TAFJ)
+    stage.regex {
+        expression = ".*sessionId=(?P<session_id>[^,}]+).*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+            session_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "TAFJ",
+            filename = "log_tafj_database",
+            log_type = "database",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            application = "T24",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// TAFJ - RUNTIME LOG
+// ============================================
+local.file_match "tafj_runtime_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\TAFJ\\log\\runtime.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "tafj_runtime_scrape" {
+    targets = local.file_match.tafj_runtime_files.targets
+    forward_to = [loki.process.tafj_runtime_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "tafj_runtime_processor" {
+    // Extraer sessionId, span_id, trace_id
+    stage.regex {
+        expression = ".*sessionId=(?P<session_id>[^,}]+).*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+            session_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "TAFJ",
+            filename = "log_tafj_runtime",
+            log_type = "runtime",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            application = "T24",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+
+// ============================================
+// TAFJ - EJB LOG
+// ============================================
+local.file_match "tafj_ejb_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\TAFJ\\log\\ejb.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "tafj_ejb_scrape" {
+    targets = local.file_match.tafj_ejb_files.targets
+    forward_to = [loki.process.tafj_ejb_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "tafj_ejb_processor" {
+    // Extraer sessionId, span_id, trace_id
+    stage.regex {
+        expression = ".*sessionId=(?P<session_id>[^,}]+).*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+            session_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "TAFJ",
+            filename = "log_tafj_ejb",
+            log_type = "ejb",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            application = "T24",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// TAFJ - DBIMPORT LOG
+// ============================================
+local.file_match "tafj_dbimport_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\TAFJ\\log\\dbimport.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "tafj_dbimport_scrape" {
+    targets = local.file_match.tafj_dbimport_files.targets
+    forward_to = [loki.process.tafj_dbimport_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "tafj_dbimport_processor" {
+    // Extraer sessionId, span_id, trace_id
+    stage.regex {
+        expression = ".*sessionId=(?P<session_id>[^,}]+).*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+            session_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "TAFJ",
+            filename = "log_tafj_dbimport",
+            log_type = "dbimport",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            application = "T24",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// TAFJ - MDB LOG
+// ============================================
+local.file_match "tafj_mdb_files" {
+    path_targets = [{"__path__" = "C:\\Temenos\\R18\\TAFJ\\log\\mdb.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "tafj_mdb_scrape" {
+    targets = local.file_match.tafj_mdb_files.targets
+    forward_to = [loki.process.tafj_mdb_processor.receiver]
+    tail_from_end = true
+}
+
+loki.process "tafj_mdb_processor" {
+    // Extraer sessionId, span_id, trace_id
+    stage.regex {
+        expression = ".*sessionId=(?P<session_id>[^,}]+).*span_id=(?P<span_id>[a-f0-9]{16}).*trace_id=(?P<trace_id>[a-f0-9]{32}).*"
+    }
+    
+    stage.labels {
+        values = {
+            trace_id = "",
+            span_id = "",
+            session_id = "",
+        }
+    }
+    
+    stage.static_labels {
+        values = {
+            job = "TAFJ",
+            filename = "log_tafj_mdb",
+            log_type = "mdb",
+            service_name = "JBOSS-APPL",
+            environment = "production",
+            hostname = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            application = "T24",
+            client = "APPL",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// LOGS TEMPORALES - Info2
+// ============================================
+
+local.file_match "temp_files" {
+    path_targets = [{"__path__" = "C:\\temp\\info2.log"}]
+    sync_period = "5s"
+}
+
+loki.source.file "temp_scrape" {
+    targets = local.file_match.temp_files.targets
+    forward_to = [loki.process.temp_processor.receiver]
+    tail_from_end = false
+}
+
+loki.process "temp_processor" {
+    stage.static_labels {
+        values = {
+            job = "temp-logs",
+            filename = "log_temp_info2",
+            server = sys.env("COMPUTERNAME"),
+            instance = "10.138.7.249",
+            source = "info2",
+        }
+    }
+    
+    forward_to = [loki.write.endpoint.receiver]
+}
+
+// ============================================
+// ENDPOINT LOKI
+// ============================================
+loki.write "endpoint" {
+    endpoint {
+        url = "http://10.138.12.21:3100/loki/api/v1/push"
+		
+		tls_config {
+            // Ruta al certificado que copiaste del Ubuntu
+            //ca_file = "C:\\Program Files\\GrafanaLabs\\Alloy\\ssl\\loki.crt"
+            
+           // OPCIONAL: Si no quieres copiar el certificado (NO RECOMENDADO para prod),
+            // puedes usar: insecure_skip_verify = true
+        }     
+        // Reintentos en caso de fallo
+        retry_on_http_429 = true
+        max_backoff_period = "5m"
+        min_backoff_period = "1s"
+    }
+    
+    external_labels = {
+        cluster = "production",
+        datacenter = "main",
+    }
+}
+
+// ============================================
+// ENDPOINT PROMETHEUS
+// ============================================
+prometheus.remote_write "default" {
+    endpoint {
+        url = "http://10.138.7.20:9090/api/v1/write"
+        
+        queue_config {
+            capacity = 10000
+            max_shards = 50
+            min_shards = 1
+            max_samples_per_send = 5000
+            batch_send_deadline = "5s"
+            min_backoff = "30ms"
+            max_backoff = "5s"
+        }
+    }
+    
+    external_labels = {
+        cluster = "production",
+        datacenter = "main",
+    }
+}
+
+// ============================================
+// TRAZAS - OTLP RECEIVER
+// ============================================
+otelcol.receiver.otlp "default" {
+    grpc {
+        endpoint = "10.138.7.249:4317"
+    }
+    http {
+        endpoint = "10.138.7.249:4318"
+    }
+    output {
+        metrics = [otelcol.processor.attributes.add_service_info.input]
+        logs = [otelcol.processor.attributes.add_service_info.input]
+        traces = [otelcol.processor.attributes.add_service_info.input]
+    }
+}
+
+// Agregar atributos del servicio y host
+otelcol.processor.attributes "add_service_info" {
+    action {
+        key = "deployment.environment"
+        value = "production"
+        action = "upsert"
+    }
+    action {
+        key = "host.ip"
+        value = "10.138.7.249"
+        action = "upsert"
+    }
+    action {
+        key = "cluster"
+        value = "production"
+        action = "upsert"
+    }
+    
+    output {
+        metrics = [otelcol.processor.batch.default.input]
+        logs = [otelcol.processor.batch.default.input]
+        traces = [otelcol.processor.batch.default.input]
+    }
+}
+
+// Procesamiento por lotes
+otelcol.processor.batch "default" {
+    timeout = "5s"
+    send_batch_size = 2048
+    send_batch_max_size = 4096
+    
+    output {
+        metrics = [otelcol.exporter.otlp.tempo.input]
+        logs = [otelcol.exporter.loki.default.input]
+        traces = [otelcol.exporter.otlp.tempo.input]
+    }
+}
+
+// Exportar a Tempo (trazas y métricas)
+otelcol.exporter.otlp "tempo" {
+    client {
+        endpoint = "http://10.138.7.20:4317"
+        tls {
+            insecure = true
+        }
+    }
+}
+
+// Exportar logs OTLP a Loki
+otelcol.exporter.loki "default" {
+    forward_to = [loki.write.endpoint.receiver]
+}
